@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lida 的小舞台</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    color: #5a4632;
+    background: linear-gradient(180deg, #fdf6ea 0%, #f3e3c8 100%);
+    background-attachment: fixed;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 16px 32px;
+  }
+  h1 {
+    font-size: clamp(44px, 12vw, 68px);
+    margin: 12px 0 0;
+    letter-spacing: 6px;
+  }
+
+  /* 舞台 */
+  .stage {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    height: 400px;
+    overflow: hidden;
+  }
+  .char-wrap {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+  }
+  #lida {
+    display: block;
+    max-width: min(240px, 70vw);
+    height: auto;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #lida.jump { animation: jump 0.6s ease; }
+  @keyframes jump {
+    0%, 100% { transform: translateY(0); }
+    35% { transform: translateY(-36px); }
+    60% { transform: translateY(0); }
+    78% { transform: translateY(-12px); }
+  }
+  #missing {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    text-align: center;
+    font-size: 22px;
+    line-height: 1.6;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  /* 對話泡泡 */
+  #bubble {
+    position: absolute;
+    left: 50%;
+    top: 16px;
+    transform: translateX(-50%);
+    max-width: 90%;
+    background: #fff;
+    border-radius: 20px;
+    padding: 12px 22px;
+    font-size: 24px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(90, 70, 50, 0.12);
+    opacity: 0;
+    transition: opacity 0.25s;
+    pointer-events: none;
+  }
+  #bubble.show { opacity: 1; }
+
+  /* 食物 */
+  .food {
+    position: absolute;
+    left: calc(50% - 160px);
+    bottom: 20px;
+    font-size: 52px;
+    animation: drop 0.9s ease-in forwards;
+    pointer-events: none;
+  }
+  @keyframes drop {
+    0% { transform: translateY(-320px); opacity: 0; }
+    15% { opacity: 1; }
+    80% { transform: translateY(0); }
+    90% { transform: translateY(-14px); }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  /* 愛心 */
+  .heart {
+    position: absolute;
+    bottom: 180px;
+    font-size: 34px;
+    animation: floatUp 1.6s ease-out forwards;
+    pointer-events: none;
+  }
+  @keyframes floatUp {
+    0% { transform: translateY(0) scale(0.6); opacity: 0; }
+    20% { opacity: 1; }
+    100% { transform: translateY(-140px) scale(1.1); opacity: 0; }
+  }
+
+  /* 按鈕 */
+  .buttons {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 8px 0 24px;
+  }
+  button {
+    font-family: inherit;
+    font-size: 26px;
+    min-height: 64px;
+    padding: 12px 32px;
+    border: none;
+    border-radius: 999px;
+    background: #e9a86b;
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #c9864a;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 #c9864a; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.soft { background: #c8b49a; box-shadow: 0 4px 0 #a8937a; }
+
+  /* 喝水紀錄 */
+  .water {
+    width: 100%;
+    max-width: 480px;
+    background: rgba(255, 255, 255, 0.65);
+    border-radius: 24px;
+    padding: 20px;
+    text-align: center;
+  }
+  .water h2 { font-size: 28px; margin: 0 0 8px; }
+  #waterCount { font-size: 40px; font-weight: bold; margin: 4px 0; }
+  #waterNote { font-size: 22px; min-height: 1.5em; margin: 0 0 12px; }
+  .goal { font-size: 22px; margin-top: 16px; }
+  select {
+    font-family: inherit;
+    font-size: 22px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 2px solid #d8c4a6;
+    background: #fff;
+    color: inherit;
+  }
+</style>
+</head>
+<body>
+
+<h1>Lida</h1>
+
+<div class="stage" id="stage">
+  <div id="bubble" aria-live="polite"></div>
+  <div class="char-wrap">
+    <img id="lida" alt="Lida">
+  </div>
+  <div id="missing" hidden>找不到 idle.gif，請確認它和網頁檔放在同一個資料夾，檔名全部小寫</div>
+</div>
+
+<div class="buttons">
+  <button id="feedBtn">餵食</button>
+  <button id="petBtn">摸摸</button>
+</div>
+
+<section class="water">
+  <h2>今天喝水紀錄</h2>
+  <div id="waterCount">0 / 8 杯</div>
+  <p id="waterNote"></p>
+  <div class="buttons" style="margin:0">
+    <button id="drinkBtn">喝了一杯</button>
+    <button id="resetBtn" class="soft">歸零</button>
+  </div>
+  <div class="goal">
+    目標杯數：
+    <select id="goalSelect"></select>
+  </div>
+</section>
+
+<script>
+  // ===== 動作播放時間（秒）=====
+  // 預設 3.2 秒 = 16 格 × 0.2 秒。依實際 GIF 長度修改這個數字即可。
+  const ACTION_SECONDS = 3.2;
+  const ACTION_MS = ACTION_SECONDS * 1000;
+
+  const IMG = { idle: 'idle.gif', eat: 'eat.gif', happy: 'happy.gif' };
+  const FOODS = ['🍙', '🍎', '🍰', '🍓', '🍪', '🍩'];
+  const LINES = ['嗨，今天也一起加油！', '我在這裡陪你～', '再摸一下嘛！'];
+
+  const stage = document.getElementById('stage');
+  const lida = document.getElementById('lida');
+  const missing = document.getElementById('missing');
+  const bubble = document.getElementById('bubble');
+  const feedBtn = document.getElementById('feedBtn');
+  const petBtn = document.getElementById('petBtn');
+
+  // 先檢查 eat.gif / happy.gif 有沒有，沒有就一律用 idle.gif
+  const has = { eat: false, happy: false };
+  ['eat', 'happy'].forEach(function (k) {
+    const im = new Image();
+    im.onload = function () { has[k] = true; };
+    im.src = IMG[k];
+  });
+
+  let current = 'idle';
+  let idleOk = true;
+  let busy = false;
+  let lineIndex = 0;
+  let actionTimer = null;
+  let extras = [];   // 這次動作產生的食物、愛心，結束時清掉
+
+  lida.addEventListener('error', function () {
+    if (current === 'idle') {
+      idleOk = false;
+      lida.style.display = 'none';
+      missing.hidden = false;
+    } else {
+      // 動作圖讀不到，改回 idle.gif
+      current = 'idle';
+      lida.src = IMG.idle;
+    }
+  });
+  lida.addEventListener('load', function () {
+    if (current === 'idle') {
+      idleOk = true;
+      lida.style.display = '';
+      missing.hidden = true;
+    }
+  });
+  lida.addEventListener('animationend', function () {
+    lida.classList.remove('jump');
+  });
+
+  function showPose(name) {
+    if (name !== 'idle' && has[name]) {
+      current = name;
+      // 加上時間參數，讓 GIF 每次都從第一格開始播
+      lida.src = IMG[name] + '?t=' + Date.now();
+    } else if (current !== 'idle' || !lida.getAttribute('src')) {
+      current = 'idle';
+      lida.src = IMG.idle;
+    }
+  }
+
+  function say(text) {
+    bubble.textContent = text;
+    bubble.classList.add('show');
+  }
+
+  function startAction(pose, text, setup) {
+    if (busy || !idleOk) return;   // 動作播放中不打斷
+    busy = true;
+    feedBtn.disabled = true;
+    petBtn.disabled = true;
+    showPose(pose);
+    say(text);
+    if (setup) setup();
+    actionTimer = setTimeout(function () {
+      extras.forEach(function (el) { el.remove(); });
+      extras = [];
+      bubble.classList.remove('show');
+      showPose('idle');
+      busy = false;
+      feedBtn.disabled = false;
+      petBtn.disabled = false;
+    }, ACTION_MS);
+  }
+
+  // 互動 1：餵食
+  function feed() {
+    startAction('eat', '好好吃！', function () {
+      const food = document.createElement('div');
+      food.className = 'food';
+      food.textContent = FOODS[Math.floor(Math.random() * FOODS.length)];
+      stage.appendChild(food);
+      extras.push(food);
+    });
+  }
+
+  // 互動 2：摸摸
+  function pet() {
+    const line = LINES[lineIndex];
+    if (busy || !idleOk) return;
+    lineIndex = (lineIndex + 1) % LINES.length;
+    startAction('happy', line, function () {
+      lida.classList.remove('jump');
+      void lida.offsetWidth;
+      lida.classList.add('jump');
+      for (let i = 0; i < 5; i++) {
+        const h = document.createElement('div');
+        h.className = 'heart';
+        h.textContent = '💗';
+        h.style.left = 'calc(50% + ' + (Math.random() * 160 - 100) + 'px)';
+        h.style.animationDelay = (i * 0.2) + 's';
+        h.addEventListener('animationend', function () { h.remove(); });
+        stage.appendChild(h);
+        extras.push(h);
+      }
+    });
+  }
+
+  feedBtn.addEventListener('click', feed);
+  petBtn.addEventListener('click', pet);
+  lida.addEventListener('click', pet);
+
+  showPose('idle');
+
+  // ===== 喝水紀錄 =====
+  const KEY = 'lida-water';
+  const countEl = document.getElementById('waterCount');
+  const noteEl = document.getElementById('waterNote');
+  const goalSelect = document.getElementById('goalSelect');
+
+  function today() {
+    const d = new Date();
+    return d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+
+  function load() {
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+    if (!data || typeof data !== 'object') data = {};
+    const goal = (Number.isInteger(data.goal) && data.goal >= 4 && data.goal <= 12) ? data.goal : 8;
+    const count = (data.date === today() && Number.isInteger(data.count) && data.count >= 0) ? data.count : 0;
+    return { date: today(), count: count, goal: goal };
+  }
+
+  let water = load();
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(water)); } catch (e) {}
+  }
+
+  function render() {
+    countEl.textContent = water.count + ' / ' + water.goal + ' 杯';
+    goalSelect.value = String(water.goal);
+    noteEl.textContent = water.count >= water.goal ? '今天的目標達成了 🎉' : '';
+  }
+
+  function checkNewDay() {
+    if (water.date !== today()) {
+      water.date = today();
+      water.count = 0;
+      save();
+      render();
+    }
+  }
+
+  for (let n = 4; n <= 12; n++) {
+    const opt = document.createElement('option');
+    opt.value = String(n);
+    opt.textContent = n + ' 杯';
+    goalSelect.appendChild(opt);
+  }
+
+  document.getElementById('drinkBtn').addEventListener('click', function () {
+    checkNewDay();
+    water.count += 1;
+    save();
+    render();
+  });
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    checkNewDay();
+    water.count = 0;
+    save();
+    render();
+  });
+  goalSelect.addEventListener('change', function () {
+    checkNewDay();
+    water.goal = parseInt(goalSelect.value, 10);
+    save();
+    render();
+  });
+
+  // 網頁一直開著跨過午夜，也會自動歸零
+  document.addEventListener('visibilitychange', checkNewDay);
+  setInterval(checkNewDay, 60000);
+
+  save();
+  render();
+</script>
+</body>
+</html>
